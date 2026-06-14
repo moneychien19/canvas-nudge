@@ -8,10 +8,38 @@ internal static class Program
         // comes from Actions secrets/vars.
         DotNetEnv.Env.TraversePath().Load();
 
-        var config = Config.Load(Environment.GetEnvironmentVariable);
+        Config config;
+        try
+        {
+            config = Config.Load(Environment.GetEnvironmentVariable);
+        }
+        catch (Exception ex)
+        {
+            // Can't reach Discord without config (no webhook); just fail loud.
+            Console.Error.WriteLine(ErrorReporter.LogText(ex));
+            return 1;
+        }
+
         PrintConfig(config);
 
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        try
+        {
+            await RunAsync(config, http);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            // Fail loud in the log (§8 / §8.1) and, if enabled, surface it in Discord.
+            Console.Error.WriteLine(ErrorReporter.LogText(ex));
+            if (config.NotifyErrorsToDiscord)
+                await TryReportErrorToDiscord(http, config.DiscordWebhookUrl, ex);
+            return 1;
+        }
+    }
+
+    private static async Task RunAsync(Config config, HttpClient http)
+    {
         var canvas = new CanvasClient(http, config.CanvasBaseUrl, config.CanvasApiToken);
 
         // Fetch the current outstanding set (spec §4).
@@ -33,8 +61,7 @@ internal static class Program
                 Label(g.CourseId), g.AssignmentName, g.DueAt, g.PendingCount))
             .ToList();
 
-        // Assemble the digest and decide what to send (spec §5). Expiry-warning
-        // (§8.2) is wired in Phase 6.
+        // Assemble the digest and decide what to send (spec §5).
         var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
         var now = DateTimeOffset.UtcNow;
         var content = DigestBuilder.Build(assignments, peerReviews, now, tz);
@@ -56,8 +83,20 @@ internal static class Program
         {
             Console.WriteLine("Nothing outstanding; staying silent (NOTIFY_WHEN_EMPTY=false).");
         }
+    }
 
-        return 0;
+    /// <summary>Best-effort error post; never let a reporting failure mask the original.</summary>
+    private static async Task TryReportErrorToDiscord(HttpClient http, string webhookUrl, Exception ex)
+    {
+        try
+        {
+            var notifier = new DiscordNotifier(http, webhookUrl);
+            await notifier.SendAsync(ErrorReporter.DiscordPayload(ex));
+        }
+        catch (Exception reportEx)
+        {
+            Console.Error.WriteLine($"（另外，回報錯誤到 Discord 也失敗了：{reportEx.Message}）");
+        }
     }
 
     /// <summary>Dump resolved config for diagnostics — never print secret values.</summary>

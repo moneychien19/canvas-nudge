@@ -85,9 +85,9 @@
 
 ## Phase 6 — error handling
 
-- [ ] **6.1 401 fix-it message (§8.1)**
+- [x] **6.1 401 fix-it message (§8.1)**
   - On Canvas 401, emit the exact zh-Hant fix-it block to log; exit non-zero.
-- [ ] **6.2 NOTIFY_ERRORS_TO_DISCORD (§8)**
+- [x] **6.2 NOTIFY_ERRORS_TO_DISCORD (§8)**
   - On failure, if enabled, POST a short zh-Hant error line to Discord too.
   - V: simulate 401 with a bad token → fix-it message in log + Discord.
 - [x] **6.3 Expiry warning + empty-send gap (§8.2)**
