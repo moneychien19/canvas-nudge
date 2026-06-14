@@ -92,6 +92,10 @@ internal static class DigestBuilder
         return new DigestContent(header, body.ToString().TrimEnd('\n'), total);
     }
 
+    /// <summary>Wrap the digest as a single Discord embed (header as title, body as description).</summary>
+    public static DiscordWebhookPayload ToPayload(DigestContent content) =>
+        new(Embeds: new[] { new DiscordEmbed(Title: content.Header, Description: content.Description) });
+
     private static string BuildHeader(int total, DateTimeOffset nowUtc, TimeZoneInfo tz)
     {
         var nowLocal = TimeZoneInfo.ConvertTime(nowUtc, tz);

@@ -121,4 +121,17 @@ public class DigestTests
         Assert.Contains("待完成 3 件", content.Description);
         Assert.Contains("作業截止 6/14", content.Description);
     }
+
+    [Fact]
+    public void ToPayload_WrapsAsSingleEmbed()
+    {
+        var content = new DigestContent("HEADER", "BODY", 1);
+
+        var payload = DigestBuilder.ToPayload(content);
+
+        var embed = Assert.Single(payload.Embeds!);
+        Assert.Equal("HEADER", embed.Title);
+        Assert.Equal("BODY", embed.Description);
+        Assert.Null(payload.Content);
+    }
 }

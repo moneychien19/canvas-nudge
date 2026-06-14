@@ -14,34 +14,41 @@ internal static class Program
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var canvas = new CanvasClient(http, config.CanvasBaseUrl, config.CanvasApiToken);
 
-        // Phase 3 (CP-B): full Canvas read path — self id, course map, outstanding
-        // assignments, and pending peer reviews. Digest assembly (Phase 4) and
-        // Discord delivery arrive next.
+        // Fetch the current outstanding set (spec §4).
         var selfId = await canvas.GetSelfIdAsync();
-        Console.WriteLine($"\nSelf id: {selfId}");
-
         var courses = await canvas.GetActiveCoursesAsync();
         var courseLabels = CanvasCourse.BuildLabelMap(courses);
-        Console.WriteLine($"Active courses: {courses.Count}");
-
         string Label(long courseId) =>
             courseLabels.TryGetValue(courseId, out var name) ? name : $"course {courseId}";
 
-        var assignments = await canvas.GetTodoAssignmentsAsync();
-        Console.WriteLine($"\nOutstanding assignments (to-do, type=submitting): {assignments.Count}");
-        foreach (var item in assignments)
-        {
-            var a = item.Assignment!;
-            var due = a.DueAt?.ToString("u") ?? "(no due date)";
-            Console.WriteLine($"  • [{Label(item.CourseId)}] {a.Name} | due {due} | {a.HtmlUrl}");
-        }
+        var todo = await canvas.GetTodoAssignmentsAsync();
+        var peerGroups = await canvas.GetPendingPeerReviewsAsync(courseLabels.Keys, selfId);
 
-        var peerReviews = await canvas.GetPendingPeerReviewsAsync(courseLabels.Keys, selfId);
-        Console.WriteLine($"\nPending peer reviews (grouped by assignment): {peerReviews.Count}");
-        foreach (var g in peerReviews)
+        var assignments = todo
+            .Select(t => new OutstandingAssignment(
+                Label(t.CourseId), t.Assignment!.Name, t.Assignment.DueAt, t.Assignment.HtmlUrl))
+            .ToList();
+        var peerReviews = peerGroups
+            .Select(g => new OutstandingPeerReview(
+                Label(g.CourseId), g.AssignmentName, g.DueAt, g.PendingCount))
+            .ToList();
+
+        // Phase 4 (CP-C): assemble the digest and post it. Empty-state and
+        // expiry-warning handling arrive in Phases 5–6.
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
+        var content = DigestBuilder.Build(assignments, peerReviews, DateTimeOffset.UtcNow, tz);
+        Console.WriteLine($"\nOutstanding items: {content.TotalCount}");
+
+        var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
+        if (content.TotalCount > 0)
         {
-            var due = g.DueAt?.ToString("u") ?? "(no due date)";
-            Console.WriteLine($"  • [{Label(g.CourseId)}] {g.AssignmentName} | pending {g.PendingCount} | due {due}");
+            await notifier.SendAsync(DigestBuilder.ToPayload(content));
+            Console.WriteLine("Digest sent to Discord.");
+        }
+        else
+        {
+            // Empty-state delivery (celebratory line) is implemented in Phase 5.
+            Console.WriteLine("Nothing outstanding (empty-state handling: Phase 5).");
         }
 
         return 0;

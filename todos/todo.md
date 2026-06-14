@@ -65,7 +65,7 @@
     (`還有 N 天`/`還有 N 小時`/`今天截止`/`已逾期 N 天`) + weekday.
   - AC: matches §5 target shape; Canvas names verbatim English, chrome zh-Hant.
   - V: unit-spot-check borderline cases (today / overdue / undated).
-- [ ] **4.2 Wire assembly into the embed**
+- [x] **4.2 Wire assembly into the embed**
   - Replace 1.3 fixed message: one embed, header `📋 待完成 — 共 N 項 · <ts>（台北時間）`,
     grouped description with `[name](html_url)` markdown links.
   - AC: real digest posts as a single message matching §5.
