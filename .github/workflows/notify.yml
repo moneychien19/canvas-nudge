@@ -1,0 +1,33 @@
+name: canvas-outstanding-notifier
+
+on:
+  schedule:
+    # every 3 hours at :17 past (avoid top-of-hour congestion). Cron is UTC.
+    - cron: "17 */3 * * *"
+  workflow_dispatch: {} # manual trigger for testing
+
+permissions:
+  contents: read # least privilege — no state commit, so no write needed
+
+concurrency:
+  group: notifier
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet run --project src/CanvasNudge.csproj -c Release
+        env:
+          CANVAS_API_TOKEN: ${{ secrets.CANVAS_API_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CANVAS_BASE_URL: ${{ vars.CANVAS_BASE_URL || 'https://canvas.cmu.edu' }}
+          TIMEZONE: ${{ vars.TIMEZONE || 'Asia/Taipei' }}
+          NOTIFY_WHEN_EMPTY: ${{ vars.NOTIFY_WHEN_EMPTY || 'true' }}
+          NOTIFY_ERRORS_TO_DISCORD: ${{ vars.NOTIFY_ERRORS_TO_DISCORD || 'true' }}
+          CANVAS_TOKEN_EXPIRES_AT: ${{ vars.CANVAS_TOKEN_EXPIRES_AT }}

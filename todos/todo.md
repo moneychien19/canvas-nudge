@@ -100,11 +100,11 @@
 
 ## Phase 7 — deploy  ▸ CP-D
 
-- [ ] **7.1 GitHub Actions workflow**
+- [x] **7.1 GitHub Actions workflow**
   - `.github/workflows/notify.yml` per §6 (cron `17 */3 * * *`, `workflow_dispatch`,
     `permissions: contents: read`, concurrency `notifier`, env wiring).
   - AC: workflow file valid; secrets/vars referenced correctly.
-- [ ] **7.2 README setup docs**
+- [x] **7.2 README setup docs**
   - Create PAT (120-day expiry), create webhook, set secrets/vars, local `.env` run.
 - [ ] **7.3 End-to-end CI run**
   - V: `workflow_dispatch` run succeeds and posts a digest.  **→ CP-D**
