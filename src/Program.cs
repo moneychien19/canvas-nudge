@@ -36,10 +36,13 @@ internal static class Program
         // Assemble the digest and decide what to send (spec §5). Expiry-warning
         // (§8.2) is wired in Phase 6.
         var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
-        var content = DigestBuilder.Build(assignments, peerReviews, DateTimeOffset.UtcNow, tz);
+        var now = DateTimeOffset.UtcNow;
+        var content = DigestBuilder.Build(assignments, peerReviews, now, tz);
         Console.WriteLine($"\nOutstanding items: {content.TotalCount}");
 
-        var payload = MessagePlanner.Plan(content, config.NotifyWhenEmpty, expiryWarning: null);
+        // Proactive PAT-expiry warning (§8.2); forces a send even on empty.
+        var expiryWarning = ExpiryWarning.Compute(config.CanvasTokenExpiresAt, now, tz);
+        var payload = MessagePlanner.Plan(content, config.NotifyWhenEmpty, expiryWarning);
         var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
         if (payload is not null)
         {

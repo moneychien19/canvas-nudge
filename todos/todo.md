@@ -90,7 +90,7 @@
 - [ ] **6.2 NOTIFY_ERRORS_TO_DISCORD (§8)**
   - On failure, if enabled, POST a short zh-Hant error line to Discord too.
   - V: simulate 401 with a bad token → fix-it message in log + Discord.
-- [ ] **6.3 Expiry warning + empty-send gap (§8.2)**
+- [x] **6.3 Expiry warning + empty-send gap (§8.2)**
   - If `CANVAS_TOKEN_EXPIRES_AT` set: >14d silent; ≤14d prepend
     `⚠️ Canvas PAT 將於 N 天後（YYYY-MM-DD）過期…`; ≤0d still warn.
   - **Gap fix:** with `NOTIFY_WHEN_EMPTY=true` default, the celebratory empty message
