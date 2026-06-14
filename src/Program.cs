@@ -14,19 +14,34 @@ internal static class Program
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var canvas = new CanvasClient(http, config.CanvasBaseUrl, config.CanvasApiToken);
 
-        // Phase 2 (CP-B): prove the Canvas read path — self id + outstanding
-        // assignments. Course names (§4.4), peer reviews (§4.3), digest assembly
-        // (Phase 4) and Discord delivery arrive next.
+        // Phase 3 (CP-B): full Canvas read path — self id, course map, outstanding
+        // assignments, and pending peer reviews. Digest assembly (Phase 4) and
+        // Discord delivery arrive next.
         var selfId = await canvas.GetSelfIdAsync();
         Console.WriteLine($"\nSelf id: {selfId}");
 
+        var courses = await canvas.GetActiveCoursesAsync();
+        var courseLabels = CanvasCourse.BuildLabelMap(courses);
+        Console.WriteLine($"Active courses: {courses.Count}");
+
+        string Label(long courseId) =>
+            courseLabels.TryGetValue(courseId, out var name) ? name : $"course {courseId}";
+
         var assignments = await canvas.GetTodoAssignmentsAsync();
-        Console.WriteLine($"Outstanding assignments (to-do, type=submitting): {assignments.Count}");
+        Console.WriteLine($"\nOutstanding assignments (to-do, type=submitting): {assignments.Count}");
         foreach (var item in assignments)
         {
             var a = item.Assignment!;
             var due = a.DueAt?.ToString("u") ?? "(no due date)";
-            Console.WriteLine($"  • course {item.CourseId} | {a.Name} | due {due} | {a.HtmlUrl}");
+            Console.WriteLine($"  • [{Label(item.CourseId)}] {a.Name} | due {due} | {a.HtmlUrl}");
+        }
+
+        var peerReviews = await canvas.GetPendingPeerReviewsAsync(courseLabels.Keys, selfId);
+        Console.WriteLine($"\nPending peer reviews (grouped by assignment): {peerReviews.Count}");
+        foreach (var g in peerReviews)
+        {
+            var due = g.DueAt?.ToString("u") ?? "(no due date)";
+            Console.WriteLine($"  • [{Label(g.CourseId)}] {g.AssignmentName} | pending {g.PendingCount} | due {due}");
         }
 
         return 0;

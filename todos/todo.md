@@ -46,11 +46,11 @@
 
 ## Phase 3 — data layer complete  ▸ CP-B
 
-- [ ] **3.1 Courses + course-name map**
+- [x] **3.1 Courses + course-name map**
   - `GET /courses?enrollment_state=active&per_page=100` → `{id: name||course_code}` map;
     reuse to label Phase 2.3 assignments.
   - AC: every assignment line resolves to a course label.
-- [ ] **3.2 Peer reviews fetch + grouping**
+- [x] **3.2 Peer reviews fetch + grouping**
   - Per course → assignments where `peer_reviews==true && published==true` →
     per assignment list peer_reviews → keep `assessor_id==self.id && workflow_state=="assigned"`.
     Group by assignment, carry count `N`.

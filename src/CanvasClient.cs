@@ -67,6 +67,49 @@ internal sealed class CanvasClient
         return todo.Where(t => t.Type == "submitting" && t.Assignment is not null).ToList();
     }
 
+    /// <summary>List the user's active courses (spec §4.4 / §4.3 step 1).</summary>
+    public Task<List<CanvasCourse>> GetActiveCoursesAsync(CancellationToken ct = default) =>
+        GetPaginatedAsync<CanvasCourse>("/courses?enrollment_state=active", ct);
+
+    /// <summary>Published, peer-review-enabled assignments in a course (spec §4.3 step 2).</summary>
+    public async Task<IReadOnlyList<CanvasAssignment>> GetPeerReviewAssignmentsAsync(
+        long courseId, CancellationToken ct = default)
+    {
+        var assignments = await GetPaginatedAsync<CanvasAssignment>(
+            $"/courses/{courseId}/assignments", ct);
+        return assignments.Where(a => a.PeerReviews && a.Published).ToList();
+    }
+
+    /// <summary>Count this user's still-"assigned" reviews for one assignment (spec §4.3 step 3).</summary>
+    public async Task<int> GetPendingPeerReviewCountAsync(
+        long courseId, long assignmentId, long selfId, CancellationToken ct = default)
+    {
+        var reviews = await GetPaginatedAsync<CanvasPeerReview>(
+            $"/courses/{courseId}/assignments/{assignmentId}/peer_reviews", ct);
+        return reviews.Count(r => r.AssessorId == selfId && r.WorkflowState == "assigned");
+    }
+
+    /// <summary>
+    /// Across the given courses, find assignments with pending peer reviews and
+    /// group them (spec §4.3): one <see cref="PeerReviewGroup"/> per assignment
+    /// that has at least one still-"assigned" review for this user.
+    /// </summary>
+    public async Task<IReadOnlyList<PeerReviewGroup>> GetPendingPeerReviewsAsync(
+        IEnumerable<long> courseIds, long selfId, CancellationToken ct = default)
+    {
+        var groups = new List<PeerReviewGroup>();
+        foreach (var courseId in courseIds)
+        {
+            foreach (var assignment in await GetPeerReviewAssignmentsAsync(courseId, ct))
+            {
+                var pending = await GetPendingPeerReviewCountAsync(courseId, assignment.Id, selfId, ct);
+                if (pending > 0)
+                    groups.Add(new PeerReviewGroup(courseId, assignment.Name, assignment.DueAt, pending));
+            }
+        }
+        return groups;
+    }
+
     /// <summary>GET a single JSON object and deserialize it.</summary>
     public async Task<T> GetAsync<T>(string path, CancellationToken ct = default)
     {

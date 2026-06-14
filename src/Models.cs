@@ -23,6 +23,29 @@ internal sealed record CanvasAssignment(
     bool PeerReviews = false,
     bool Published = false);
 
+/// <summary>A course from GET /courses (spec §4.4).</summary>
+internal sealed record CanvasCourse(long Id, string? Name, string? CourseCode)
+{
+    /// <summary>Display label: prefer name, fall back to course_code, then id.</summary>
+    public string Label => Name ?? CourseCode ?? $"course {Id}";
+
+    public static IReadOnlyDictionary<long, string> BuildLabelMap(IEnumerable<CanvasCourse> courses) =>
+        courses.GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First().Label);
+}
+
+/// <summary>A single peer-review row (spec §4.3).</summary>
+internal sealed record CanvasPeerReview(long AssessorId, string WorkflowState);
+
+/// <summary>
+/// Pending peer reviews grouped by their parent assignment (spec §4.3): one row
+/// per assignment carrying the count N of still-"assigned" reviews.
+/// </summary>
+internal sealed record PeerReviewGroup(
+    long CourseId,
+    string AssignmentName,
+    DateTimeOffset? DueAt,
+    int PendingCount);
+
 // --- Discord webhook payload DTOs (System.Text.Json, explicit names). ---
 
 internal sealed record DiscordWebhookPayload(
