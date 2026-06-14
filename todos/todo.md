@@ -59,7 +59,7 @@
 
 ## Phase 4 — real digest  ▸ CP-C
 
-- [ ] **4.1 Domain assembly (grouping, sorting, relative time)**
+- [x] **4.1 Domain assembly (grouping, sorting, relative time)**
   - Build outstanding model; group by category (作業 / 同儕互評); sort each by `due_at`
     asc, undated (`無截止日`) last; render due in `TIMEZONE` with zh-Hant relative hints
     (`還有 N 天`/`還有 N 小時`/`今天截止`/`已逾期 N 天`) + weekday.

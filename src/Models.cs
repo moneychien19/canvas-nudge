@@ -46,6 +46,25 @@ internal sealed record PeerReviewGroup(
     DateTimeOffset? DueAt,
     int PendingCount);
 
+// --- Domain models (decoupled from Canvas JSON; consumed by the digest). ---
+
+/// <summary>An outstanding assignment, labelled with its course, ready to render.</summary>
+internal sealed record OutstandingAssignment(
+    string CourseLabel,
+    string Name,
+    DateTimeOffset? DueAt,
+    string? HtmlUrl);
+
+/// <summary>Pending peer reviews for one assignment, labelled and ready to render.</summary>
+internal sealed record OutstandingPeerReview(
+    string CourseLabel,
+    string AssignmentName,
+    DateTimeOffset? DueAt,
+    int PendingCount);
+
+/// <summary>Rendered digest pieces: header line + grouped body + total item count.</summary>
+internal sealed record DigestContent(string Header, string Description, int TotalCount);
+
 // --- Discord webhook payload DTOs (System.Text.Json, explicit names). ---
 
 internal sealed record DiscordWebhookPayload(
