@@ -33,22 +33,22 @@ internal static class Program
                 Label(g.CourseId), g.AssignmentName, g.DueAt, g.PendingCount))
             .ToList();
 
-        // Phase 4 (CP-C): assemble the digest and post it. Empty-state and
-        // expiry-warning handling arrive in Phases 5–6.
+        // Assemble the digest and decide what to send (spec §5). Expiry-warning
+        // (§8.2) is wired in Phase 6.
         var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
         var content = DigestBuilder.Build(assignments, peerReviews, DateTimeOffset.UtcNow, tz);
         Console.WriteLine($"\nOutstanding items: {content.TotalCount}");
 
+        var payload = MessagePlanner.Plan(content, config.NotifyWhenEmpty, expiryWarning: null);
         var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
-        if (content.TotalCount > 0)
+        if (payload is not null)
         {
-            await notifier.SendAsync(DigestBuilder.ToPayload(content));
-            Console.WriteLine("Digest sent to Discord.");
+            await notifier.SendAsync(payload);
+            Console.WriteLine("Message sent to Discord.");
         }
         else
         {
-            // Empty-state delivery (celebratory line) is implemented in Phase 5.
-            Console.WriteLine("Nothing outstanding (empty-state handling: Phase 5).");
+            Console.WriteLine("Nothing outstanding; staying silent (NOTIFY_WHEN_EMPTY=false).");
         }
 
         return 0;

@@ -73,7 +73,7 @@
 
 ## Phase 5 — edge cases
 
-- [ ] **5.1 Empty state**
+- [x] **5.1 Empty state**
   - Zero items + `NOTIFY_WHEN_EMPTY=true` (**default**) → send `恭喜，目前沒有未完成事項 🎉`
     (also carries any active §8.2 expiry warning); `=false` → send nothing.
   - V: toggle var, run both ways.
