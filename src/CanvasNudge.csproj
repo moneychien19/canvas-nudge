@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CanvasNudge</RootNamespace>
+    <!-- Do NOT enable InvariantGlobalization: breaks TimeZoneInfo IANA + zh-Hant. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CanvasNudge.Tests" />
+  </ItemGroup>
+
+</Project>
