@@ -7,3 +7,6 @@ obj/
 
 # misc
 .DS_Store
+
+# local Claude Code settings
+.claude/settings.local.json
