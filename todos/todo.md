@@ -77,7 +77,7 @@
   - Zero items + `NOTIFY_WHEN_EMPTY=true` (**default**) → send `恭喜，目前沒有未完成事項 🎉`
     (also carries any active §8.2 expiry warning); `=false` → send nothing.
   - V: toggle var, run both ways.
-- [ ] **5.2 Over-length chunking (defensive)**
+- [x] **5.2 Over-length chunking (defensive)**
   - If description > 4096, split into sequential POSTs at item boundaries (never truncate).
   - AC: long synthetic list splits cleanly; normal list = single message.
 - [ ] **5.3 Webhook POST 429 retry**

@@ -43,8 +43,11 @@ internal static class Program
         var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
         if (payload is not null)
         {
-            await notifier.SendAsync(payload);
-            Console.WriteLine("Message sent to Discord.");
+            // Defensive: a normal digest is one message; only an over-length one splits.
+            var parts = Chunker.Chunk(payload);
+            foreach (var part in parts)
+                await notifier.SendAsync(part);
+            Console.WriteLine($"Message sent to Discord ({parts.Count} message(s)).");
         }
         else
         {
