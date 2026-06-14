@@ -1,0 +1,9 @@
+# secrets — never commit
+.env
+
+# .NET build output
+bin/
+obj/
+
+# misc
+.DS_Store
