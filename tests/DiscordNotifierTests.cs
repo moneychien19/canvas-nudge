@@ -33,7 +33,71 @@ public class DiscordNotifierTests
         }
     }
 
+    /// <summary>Replays a queued sequence of responses.</summary>
+    private sealed class SequenceHandler : HttpMessageHandler
+    {
+        private readonly Queue<HttpResponseMessage> _responses;
+        public int Calls { get; private set; }
+        public SequenceHandler(params HttpResponseMessage[] responses) =>
+            _responses = new Queue<HttpResponseMessage>(responses);
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(_responses.Dequeue());
+        }
+    }
+
+    private static HttpResponseMessage Resp(int status, string? retryAfter = null)
+    {
+        var msg = new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("") };
+        if (retryAfter is not null) msg.Headers.TryAddWithoutValidation("Retry-After", retryAfter);
+        return msg;
+    }
+
+    private static (Func<TimeSpan, CancellationToken, Task> fn, List<TimeSpan> calls) FakeDelay()
+    {
+        var calls = new List<TimeSpan>();
+        return ((d, _) => { calls.Add(d); return Task.CompletedTask; }, calls);
+    }
+
     private const string Webhook = "https://discord.com/api/webhooks/1/abc";
+
+    [Fact]
+    public async Task SendAsync_RetriesOnce_On429_ThenSucceeds()
+    {
+        var handler = new SequenceHandler(Resp(429), Resp(204));
+        var (delay, calls) = FakeDelay();
+        var notifier = new DiscordNotifier(new HttpClient(handler), Webhook, delay);
+
+        await notifier.SendAsync(new DiscordWebhookPayload(Content: "x"));
+
+        Assert.Equal(2, handler.Calls);
+        Assert.Single(calls);
+    }
+
+    [Fact]
+    public async Task SendAsync_HonorsRetryAfter_On429()
+    {
+        var handler = new SequenceHandler(Resp(429, retryAfter: "4"), Resp(204));
+        var (delay, calls) = FakeDelay();
+        var notifier = new DiscordNotifier(new HttpClient(handler), Webhook, delay);
+
+        await notifier.SendAsync(new DiscordWebhookPayload(Content: "x"));
+
+        Assert.Equal(TimeSpan.FromSeconds(4), calls[0]);
+    }
+
+    [Fact]
+    public async Task SendAsync_Throws_When429Persists()
+    {
+        var handler = new SequenceHandler(Resp(429), Resp(429));
+        var (delay, _) = FakeDelay();
+        var notifier = new DiscordNotifier(new HttpClient(handler), Webhook, delay);
+
+        await Assert.ThrowsAsync<DiscordException>(
+            () => notifier.SendAsync(new DiscordWebhookPayload(Content: "x")));
+        Assert.Equal(2, handler.Calls);  // original + 1 retry
+    }
 
     [Fact]
     public async Task SendAsync_PostsJsonToWebhook_OnSuccess()

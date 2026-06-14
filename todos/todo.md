@@ -80,7 +80,7 @@
 - [x] **5.2 Over-length chunking (defensive)**
   - If description > 4096, split into sequential POSTs at item boundaries (never truncate).
   - AC: long synthetic list splits cleanly; normal list = single message.
-- [ ] **5.3 Webhook POST 429 retry**
+- [x] **5.3 Webhook POST 429 retry**
   - On webhook `429`, honor `retry_after` and retry once.
 
 ## Phase 6 — error handling

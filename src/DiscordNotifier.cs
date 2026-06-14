@@ -30,22 +30,46 @@ internal sealed class DiscordNotifier
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    private static readonly TimeSpan DefaultRateLimitDelay = TimeSpan.FromSeconds(2);
+
     private readonly HttpClient _http;
     private readonly string _webhookUrl;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
-    public DiscordNotifier(HttpClient http, string webhookUrl)
+    public DiscordNotifier(
+        HttpClient http, string webhookUrl, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _http = http;
         _webhookUrl = webhookUrl;
+        _delay = delay ?? Task.Delay;
     }
 
     public async Task SendAsync(DiscordWebhookPayload payload, CancellationToken ct = default)
     {
-        using var response = await _http.PostAsJsonAsync(_webhookUrl, payload, JsonOptions, ct);
-        if (!response.IsSuccessStatusCode)
+        for (var attempt = 0; ; attempt++)
         {
+            using var response = await _http.PostAsJsonAsync(_webhookUrl, payload, JsonOptions, ct);
+            if (response.IsSuccessStatusCode) return;
+
+            // Discord rate-limits with 429; honor Retry-After and retry once (spec §5).
+            if ((int)response.StatusCode == 429 && attempt == 0)
+            {
+                await _delay(RetryAfter(response), ct);
+                continue;
+            }
+
             var body = await response.Content.ReadAsStringAsync(ct);
             throw new DiscordException((int)response.StatusCode, body);
         }
+    }
+
+    private static TimeSpan RetryAfter(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("Retry-After", out var values)
+            && int.TryParse(values.FirstOrDefault(), out var seconds))
+        {
+            return TimeSpan.FromSeconds(seconds);
+        }
+        return DefaultRateLimitDelay;
     }
 }
