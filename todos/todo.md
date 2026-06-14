@@ -5,7 +5,7 @@
 
 ## Phase 0 — bootstrap
 
-- [ ] **0.1 git init + repo hygiene**
+- [x] **0.1 git init + repo hygiene**
   - AC: `git init` done; first commit excludes secrets.
   - V: `git status` clean of `.env`, `bin/`, `obj/`.
 
@@ -28,16 +28,16 @@
 
 ## Phase 2 — Canvas read path proven
 
-- [ ] **2.1 CanvasClient core (auth + pagination + retry)**
+- [x] **2.1 CanvasClient core (auth + pagination + retry)**
   - Bearer auth on every request; `?per_page=100`; follow `Link rel="next"`;
     on `401` fail loud; on `403`/`429` sleep ~5s (honor `Retry-After`) retry once.
   - AC: pagination exhausts; retry fires once then fails loud.
   - V: hit a paginated endpoint, confirm all pages fetched.
-- [ ] **2.2 Models — Canvas DTOs**
+- [x] **2.2 Models — Canvas DTOs**
   - `System.Text.Json` DTOs for `/users/self`, todo item + `assignment`, course,
     assignment, peer_review (§4).
   - AC: deserialization handles null `due_at`.
-- [ ] **2.3 Fetch self id + todo assignments**
+- [x] **2.3 Fetch self id + todo assignments**
   - `GET /users/self`; `GET /users/self/todo` → keep `type=="submitting"`; pull
     `assignment.name/.due_at/.html_url` + `course_id` (confirm `assignment.html_url`
     populated, else top-level `html_url`).

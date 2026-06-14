@@ -11,19 +11,24 @@ internal static class Program
         var config = Config.Load(Environment.GetEnvironmentVariable);
         PrintConfig(config);
 
-        // Phase 1 milestone (CP-A): prove the Discord webhook path end-to-end with a
-        // fixed message. Real digest assembly arrives in Phase 4.
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
-        var payload = new DiscordWebhookPayload(Embeds: new[]
-        {
-            new DiscordEmbed(
-                Title: "📋 Canvas Nudge — 連線測試",
-                Description: "Webhook 連線成功 ✅（這是 scaffold 階段的測試訊息）"),
-        });
+        var canvas = new CanvasClient(http, config.CanvasBaseUrl, config.CanvasApiToken);
 
-        await notifier.SendAsync(payload);
-        Console.WriteLine("Sent test message to Discord.");
+        // Phase 2 (CP-B): prove the Canvas read path — self id + outstanding
+        // assignments. Course names (§4.4), peer reviews (§4.3), digest assembly
+        // (Phase 4) and Discord delivery arrive next.
+        var selfId = await canvas.GetSelfIdAsync();
+        Console.WriteLine($"\nSelf id: {selfId}");
+
+        var assignments = await canvas.GetTodoAssignmentsAsync();
+        Console.WriteLine($"Outstanding assignments (to-do, type=submitting): {assignments.Count}");
+        foreach (var item in assignments)
+        {
+            var a = item.Assignment!;
+            var due = a.DueAt?.ToString("u") ?? "(no due date)";
+            Console.WriteLine($"  • course {item.CourseId} | {a.Name} | due {due} | {a.HtmlUrl}");
+        }
+
         return 0;
     }
 

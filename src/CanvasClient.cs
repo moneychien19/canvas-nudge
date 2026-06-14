@@ -29,6 +29,8 @@ internal sealed class CanvasClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        // Canvas uses snake_case; map to PascalCase DTO properties.
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         PropertyNameCaseInsensitive = true,
     };
 
@@ -48,6 +50,21 @@ internal sealed class CanvasClient
         _apiBase = canvasBaseUrl.TrimEnd('/') + "/api/v1";
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         _delay = delay ?? Task.Delay;
+    }
+
+    /// <summary>Resolve the authenticated user's id (spec §4.1).</summary>
+    public async Task<long> GetSelfIdAsync(CancellationToken ct = default) =>
+        (await GetAsync<CanvasUser>("/users/self", ct)).Id;
+
+    /// <summary>
+    /// Outstanding assignments via the to-do list (spec §4.2): keep only
+    /// type=="submitting" items that carry an assignment. Canvas has already
+    /// filtered to not-yet-done, so no completion check is needed here.
+    /// </summary>
+    public async Task<IReadOnlyList<CanvasTodoItem>> GetTodoAssignmentsAsync(CancellationToken ct = default)
+    {
+        var todo = await GetPaginatedAsync<CanvasTodoItem>("/users/self/todo", ct);
+        return todo.Where(t => t.Type == "submitting" && t.Assignment is not null).ToList();
     }
 
     /// <summary>GET a single JSON object and deserialize it.</summary>
