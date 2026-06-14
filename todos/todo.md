@@ -11,7 +11,7 @@
 
 ## Phase 1 — Discord path proven  ▸ CP-A
 
-- [ ] **1.1 Project scaffold**
+- [x] **1.1 Project scaffold**
   - Create `src/CanvasNudge.csproj` (net8.0, `Nullable=enable`, `ImplicitUsings=enable`,
     NO `InvariantGlobalization`), `.gitignore` (`.env`, `bin/`, `obj/`), `.env.example`
     documenting every var from spec §3.
