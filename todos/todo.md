@@ -17,11 +17,11 @@
     documenting every var from spec §3.
   - AC: `dotnet build` succeeds; `.gitignore` covers secrets.
   - V: `dotnet build -c Release` exits 0.
-- [ ] **1.2 Config loader**
+- [x] **1.2 Config loader**
   - Read all env vars (§3); optional `DotNetEnv` guarded so missing `.env` is a no-op.
   - AC: all 7 config keys load with documented defaults; secrets required, others optional.
   - V: run with a dummy `.env`, print resolved config (no secret values).
-- [ ] **1.3 DiscordNotifier — POST a fixed message**
+- [x] **1.3 DiscordNotifier — POST a fixed message** (code+tests done; CP-A awaits real webhook)
   - `HttpClient` POST a hardcoded embed to `DISCORD_WEBHOOK_URL`.
   - AC: a test message appears in the channel; non-2xx → log body+status, exit non-zero.
   - V: `dotnet run` → message visible in Discord.  **→ CP-A**
