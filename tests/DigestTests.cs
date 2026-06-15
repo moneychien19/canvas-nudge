@@ -97,7 +97,7 @@ public class DigestTests
         };
         var peer = new[]
         {
-            new OutstandingPeerReview("15-513", "Design Doc", TaipeiUtc(2026, 6, 14, 23, 59), 3),
+            new OutstandingPeerReview("15-513", "Design Doc", TaipeiUtc(2026, 6, 17, 23, 59), 3),
         };
 
         var content = DigestBuilder.Build(assignments, peer, Now, Taipei);
@@ -119,7 +119,22 @@ public class DigestTests
 
         Assert.Contains("互評：「Design Doc」", content.Description);
         Assert.Contains("待完成 3 件", content.Description);
-        Assert.Contains("作業截止 6/14", content.Description);
+        Assert.Contains("互評截止 6/17", content.Description);   // peer-review deadline + relative hint
+        Assert.Contains("還有 2 天", content.Description);
+    }
+
+    [Fact]
+    public void PeerReviewLine_MarksOverdue()
+    {
+        var peer = new[]
+        {
+            new OutstandingPeerReview("C", "Late Review", TaipeiUtc(2026, 6, 12, 12, 10), 2),
+        };
+
+        var content = DigestBuilder.Build(Array.Empty<OutstandingAssignment>(), peer, Now, Taipei);
+
+        Assert.Contains("已逾期 3 天", content.Description);
+        Assert.Contains("⚠️", content.Description);
     }
 
     [Fact]

@@ -86,7 +86,7 @@ internal static class DigestBuilder
             if (body.Length > 0) body.Append('\n');
             body.Append("同儕互評 (").Append(peerReviews.Count).Append(")\n");
             foreach (var p in SortByDue(peerReviews, x => x.DueAt))
-                body.Append(PeerReviewLine(p, tz)).Append('\n');
+                body.Append(PeerReviewLine(p, nowUtc, tz)).Append('\n');
         }
 
         return new DigestContent(header, body.ToString().TrimEnd('\n'), total);
@@ -125,11 +125,16 @@ internal static class DigestBuilder
             : $"{prefix}截止 {TimeFormatting.AbsoluteDue(a.DueAt.Value, tz)}（{hint}）";
     }
 
-    private static string PeerReviewLine(OutstandingPeerReview p, TimeZoneInfo tz)
+    private static string PeerReviewLine(OutstandingPeerReview p, DateTimeOffset nowUtc, TimeZoneInfo tz)
     {
-        var context = p.DueAt is null
-            ? "無截止日"
-            : $"作業截止 {TimeFormatting.ShortDate(p.DueAt.Value, tz)}";
-        return $"• [{p.CourseLabel}] 互評：「{p.AssignmentName}」— 待完成 {p.PendingCount} 件（{context}）";
+        var head = $"• [{p.CourseLabel}] 互評：「{p.AssignmentName}」— 待完成 {p.PendingCount} 件";
+
+        if (p.DueAt is null)
+            return $"{head}（無截止日）";
+
+        // DueAt is the peer-review deadline (§4.3); show it with a relative hint.
+        var hint = TimeFormatting.RelativeHint(p.DueAt.Value, nowUtc, tz, out var overdue);
+        var line = $"{head}（互評截止 {TimeFormatting.ShortDate(p.DueAt.Value, tz)}，{hint}）";
+        return overdue ? $"{line} ⚠️" : line;
     }
 }

@@ -30,15 +30,21 @@ internal static class PeerReviewParser
             if (pending == 0) continue;
 
             var name = TryProp(node, "name", out var n) ? n.GetString() ?? "(unnamed)" : "(unnamed)";
-            DateTimeOffset? dueAt =
-                TryProp(node, "dueAt", out var d) && d.ValueKind == JsonValueKind.String
-                && DateTimeOffset.TryParse(d.GetString(), out var parsed)
-                    ? parsed
-                    : null;
+
+            // Prefer the peer-review-specific due date (when the reviews are actually
+            // due); fall back to the assignment due date if it isn't configured.
+            var peerDue = TryProp(node, "peerReviews", out var pr) ? ParseDate(pr, "dueAt") : null;
+            var dueAt = peerDue ?? ParseDate(node, "dueAt");
 
             yield return new PeerReviewGroup(courseId, name, dueAt, pending);
         }
     }
+
+    private static DateTimeOffset? ParseDate(JsonElement el, string name) =>
+        TryProp(el, name, out var d) && d.ValueKind == JsonValueKind.String
+        && DateTimeOffset.TryParse(d.GetString(), out var parsed)
+            ? parsed
+            : null;
 
     private static bool TryProp(JsonElement el, string name, out JsonElement value)
     {

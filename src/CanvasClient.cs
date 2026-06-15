@@ -87,6 +87,7 @@ internal sealed class CanvasClient
                 _id
                 name
                 dueAt
+                peerReviews { dueAt }
                 assessmentRequestsForCurrentUser { workflowState }
               }
             }

@@ -132,6 +132,7 @@ current user must complete, correctly scoped — no self-id filter needed.
            _id
            name
            dueAt
+           peerReviews { dueAt }
            assessmentRequestsForCurrentUser { workflowState }
          }
        }
@@ -145,9 +146,10 @@ current user must complete, correctly scoped — no self-id filter needed.
 One assignment can assign you **multiple** reviews (e.g. review 3 classmates →
 3 entries). **Group by assignment** and carry a count `N` of still-`assigned`
 reviews — don't emit one digest line per review. Each group → display the parent
-assignment's `name` + `dueAt` as context plus the pending count `N`. (Note: `dueAt`
-is the *assignment* due date, per the original spec; the peer-review-specific due
-date — often later — is a possible v2 refinement.)
+assignment's `name` plus the pending count `N`, with the **peer-review due date**
+(`peerReviews.dueAt`) as context, falling back to the assignment `dueAt` when the
+peer-review date isn't configured. Render it with the same relative hint / overdue
+treatment as assignments (labelled `互評截止`).
 
 ### 4.4 Course names
 
@@ -176,7 +178,7 @@ Target shape:
 • [15-619] Project Phase 1 — 已逾期 1 天 ⚠️
 
 同儕互評 (1)
-• [15-513] 互評：「Design Doc」— 待完成 3 件（作業截止 6/14）
+• [15-513] 互評：「Design Doc」— 待完成 3 件（互評截止 6/14，還有 2 天）
 ```
 
 The peer-review category counts **assignments with pending reviews**, not the raw

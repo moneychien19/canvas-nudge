@@ -41,20 +41,23 @@ public class CoursesAndPeerReviewTests
     // Real Canvas GraphQL response shape (captured from canvas.cmu.edu).
     private const string GraphQlBody = """
     { "data": { "course": { "assignmentsConnection": { "nodes": [
-        { "_id": "1", "name": "WA1", "dueAt": "2026-06-14T23:59:59-04:00",
+        { "_id": "1", "name": "WA1", "dueAt": "2026-06-11T23:59:59-04:00",
+          "peerReviews": { "dueAt": "2026-06-14T12:10:00-04:00" },
           "assessmentRequestsForCurrentUser": [
             { "workflowState": "assigned" }, { "workflowState": "assigned" },
             { "workflowState": "assigned" } ] },
         { "_id": "2", "name": "WA2", "dueAt": "2026-05-29T23:59:59-04:00",
+          "peerReviews": { "dueAt": "2026-05-30T12:10:00-04:00" },
           "assessmentRequestsForCurrentUser": [
             { "workflowState": "completed" }, { "workflowState": "completed" } ] },
-        { "_id": "3", "name": "WA3 undated", "dueAt": null,
+        { "_id": "3", "name": "WA3 no PR due", "dueAt": "2026-07-01T23:59:59-04:00",
+          "peerReviews": { "dueAt": null },
           "assessmentRequestsForCurrentUser": [ { "workflowState": "assigned" } ] }
     ] } } } }
     """;
 
     [Fact]
-    public async Task GetPendingPeerReviews_GroupsAssignedOnly_OmitsCompleted()
+    public async Task GetPendingPeerReviews_PrefersPeerReviewDueDate_FallsBackToAssignment()
     {
         var groups = await Client(new StubHandler(GraphQlBody))
             .GetPendingPeerReviewsAsync(new long[] { 100 });
@@ -64,11 +67,12 @@ public class CoursesAndPeerReviewTests
         var wa1 = groups.Single(g => g.AssignmentName == "WA1");
         Assert.Equal(100, wa1.CourseId);
         Assert.Equal(3, wa1.PendingCount);
-        Assert.Equal(new DateTimeOffset(2026, 6, 14, 23, 59, 59, TimeSpan.FromHours(-4)), wa1.DueAt);
+        // peerReviews.dueAt (6/14) wins over assignment dueAt (6/11)
+        Assert.Equal(new DateTimeOffset(2026, 6, 14, 12, 10, 0, TimeSpan.FromHours(-4)), wa1.DueAt);
 
-        var wa3 = groups.Single(g => g.AssignmentName == "WA3 undated");
-        Assert.Equal(1, wa3.PendingCount);
-        Assert.Null(wa3.DueAt);
+        var wa3 = groups.Single(g => g.AssignmentName == "WA3 no PR due");
+        // peerReviews.dueAt null -> falls back to assignment dueAt (7/1)
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 23, 59, 59, TimeSpan.FromHours(-4)), wa3.DueAt);
     }
 
     [Fact]
