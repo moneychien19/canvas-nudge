@@ -85,7 +85,8 @@ fails, fail loud (non-zero exit). Volume here is tiny (a handful of courses ever
 
 ### 4.1 Resolve self id
 
-`GET /users/self` → keep `id` (needed to filter peer reviews).
+`GET /users/self` → keep `id`. (No longer required for peer reviews — see §4.3 —
+since GraphQL scopes to the current user. Kept as an optional auth sanity check.)
 
 ### 4.2 Outstanding assignments — via the to-do list
 
@@ -105,30 +106,52 @@ Known limitation (acceptable for MVP): the to-do list may omit assignments with 
 due date or far-future items. That's fine for now; broadening to per-course
 `bucket=unsubmitted` is a v2 option.
 
-### 4.3 Outstanding peer reviews — via the peer-review endpoint
+### 4.3 Outstanding peer reviews — via **GraphQL** (REST does not work for students)
 
-Peer reviews are **not** reliably in the to-do list, so query them explicitly:
+> **Why not the REST `peer_reviews` endpoint?** The original plan was
+> `GET /courses/{id}/assignments/{aid}/peer_reviews` filtered by
+> `assessor_id == self.id`. **Verified against canvas.cmu.edu, this does not work
+> for a student account:** that endpoint only returns peer reviews of *your own*
+> submission (`asset_id` == your submission), with **no `assessor_id` field** at
+> all — a student can't list other students' submissions, which is where the
+> reviews-you-must-do live. It surfaces "who is reviewing me," not "what I owe."
+> `include[]=assessment_requests` / `assigned_assessments` are also absent.
 
-1. List active courses:
-   `GET /courses?enrollment_state=active&per_page=100`
-2. For each course, list assignments and keep the ones with peer review enabled:
-   `GET /courses/{course_id}/assignments?per_page=100`
-   → keep where `peer_reviews == true` and `published == true`.
-   Retain `id`, `name`, `due_at` for each.
-3. For each such assignment, list its peer reviews:
-   `GET /courses/{course_id}/assignments/{assignment_id}/peer_reviews?per_page=100`
-   → keep where `assessor_id == self.id` **and** `workflow_state == "assigned"`.
-   (`workflow_state` is `"assigned"` = still to do, `"completed"` = done.)
+Use Canvas **GraphQL** (`POST {CANVAS_BASE_URL}/api/graphql`, same Bearer token).
+The field `assessmentRequestsForCurrentUser` returns exactly the reviews the
+current user must complete, correctly scoped — no self-id filter needed.
 
-One assignment can assign you **multiple** reviews (e.g. you must review 3
-classmates' submissions → 3 rows here with `assessor_id == self.id`). **Group these
-by assignment** and carry a count `N` of still-`assigned` reviews — do not emit one
-digest line per individual review. Each group → display the parent assignment's
-`name` + `due_at` as context plus the pending count `N`, labeled as a pending review.
+1. List active courses (still REST): `GET /courses?enrollment_state=active&per_page=100`
+   (also used for the course-name map, §4.4).
+2. For each course, run:
+   ```graphql
+   query($courseId: ID!) {
+     course(id: $courseId) {
+       assignmentsConnection {
+         nodes {
+           _id
+           name
+           dueAt
+           assessmentRequestsForCurrentUser { workflowState }
+         }
+       }
+     }
+   }
+   ```
+   For each assignment node, count `assessmentRequestsForCurrentUser` entries with
+   `workflowState == "assigned"` (`"completed"` = done). GraphQL returns 200 even
+   on failure — check the `errors` array and fail loud if present.
+
+One assignment can assign you **multiple** reviews (e.g. review 3 classmates →
+3 entries). **Group by assignment** and carry a count `N` of still-`assigned`
+reviews — don't emit one digest line per review. Each group → display the parent
+assignment's `name` + `dueAt` as context plus the pending count `N`. (Note: `dueAt`
+is the *assignment* due date, per the original spec; the peer-review-specific due
+date — often later — is a possible v2 refinement.)
 
 ### 4.4 Course names
 
-Build a `{course_id: course_name}` map from the 4.3 step-1 course list and reuse it
+Build a `{course_id: course_name}` map from the §4.3 step-1 course list and reuse it
 to label assignment items from 4.2. Use `name` (fall back to `course_code`).
 
 ## 5. Discord output

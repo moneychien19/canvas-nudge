@@ -10,18 +10,12 @@ internal sealed record CanvasUser(long Id);
 /// <summary>An item from GET /users/self/todo (spec §4.2).</summary>
 internal sealed record CanvasTodoItem(string Type, long CourseId, CanvasAssignment? Assignment);
 
-/// <summary>
-/// A Canvas assignment. Reused by the todo list (§4.2) and the peer-review
-/// scan (§4.3). PeerReviews/Published are only populated by the assignments
-/// endpoint; they default false elsewhere.
-/// </summary>
+/// <summary>A Canvas assignment as carried by the to-do list (spec §4.2).</summary>
 internal sealed record CanvasAssignment(
     long Id,
     string Name,
     DateTimeOffset? DueAt,
-    string? HtmlUrl,
-    bool PeerReviews = false,
-    bool Published = false);
+    string? HtmlUrl);
 
 /// <summary>A course from GET /courses (spec §4.4).</summary>
 internal sealed record CanvasCourse(long Id, string? Name, string? CourseCode)
@@ -32,9 +26,6 @@ internal sealed record CanvasCourse(long Id, string? Name, string? CourseCode)
     public static IReadOnlyDictionary<long, string> BuildLabelMap(IEnumerable<CanvasCourse> courses) =>
         courses.GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First().Label);
 }
-
-/// <summary>A single peer-review row (spec §4.3).</summary>
-internal sealed record CanvasPeerReview(long AssessorId, string WorkflowState);
 
 /// <summary>
 /// Pending peer reviews grouped by their parent assignment (spec §4.3): one row

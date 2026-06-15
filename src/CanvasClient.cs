@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace CanvasNudge;
@@ -38,6 +39,7 @@ internal sealed class CanvasClient
 
     private readonly HttpClient _http;
     private readonly string _apiBase;
+    private readonly string _graphqlUrl;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
     public CanvasClient(
@@ -47,7 +49,9 @@ internal sealed class CanvasClient
         Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _http = http;
-        _apiBase = canvasBaseUrl.TrimEnd('/') + "/api/v1";
+        var root = canvasBaseUrl.TrimEnd('/');
+        _apiBase = root + "/api/v1";
+        _graphqlUrl = root + "/api/graphql";
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         _delay = delay ?? Task.Delay;
     }
@@ -71,49 +75,67 @@ internal sealed class CanvasClient
     public Task<List<CanvasCourse>> GetActiveCoursesAsync(CancellationToken ct = default) =>
         GetPaginatedAsync<CanvasCourse>("/courses?enrollment_state=active", ct);
 
-    /// <summary>Published, peer-review-enabled assignments in a course (spec §4.3 step 2).</summary>
-    public async Task<IReadOnlyList<CanvasAssignment>> GetPeerReviewAssignmentsAsync(
-        long courseId, CancellationToken ct = default)
-    {
-        var assignments = await GetPaginatedAsync<CanvasAssignment>(
-            $"/courses/{courseId}/assignments", ct);
-        return assignments.Where(a => a.PeerReviews && a.Published).ToList();
-    }
-
-    /// <summary>Count this user's still-"assigned" reviews for one assignment (spec §4.3 step 3).</summary>
-    public async Task<int> GetPendingPeerReviewCountAsync(
-        long courseId, long assignmentId, long selfId, CancellationToken ct = default)
-    {
-        var reviews = await GetPaginatedAsync<CanvasPeerReview>(
-            $"/courses/{courseId}/assignments/{assignmentId}/peer_reviews", ct);
-        return reviews.Count(r => r.AssessorId == selfId && r.WorkflowState == "assigned");
-    }
+    // GraphQL query: the peer reviews THIS user must complete, per assignment in a
+    // course. The REST peer_reviews index can't do this for a student — it only
+    // returns reviews of the student's OWN submission (spec §4.3). GraphQL's
+    // assessmentRequestsForCurrentUser correctly scopes to "reviews I owe".
+    private const string PeerReviewQuery = """
+        query($courseId: ID!) {
+          course(id: $courseId) {
+            assignmentsConnection {
+              nodes {
+                _id
+                name
+                dueAt
+                assessmentRequestsForCurrentUser { workflowState }
+              }
+            }
+          }
+        }
+        """;
 
     /// <summary>
-    /// Across the given courses, find assignments with pending peer reviews and
-    /// group them (spec §4.3): one <see cref="PeerReviewGroup"/> per assignment
-    /// that has at least one still-"assigned" review for this user.
+    /// Across the given courses, find assignments with peer reviews this user still
+    /// owes (workflowState=="assigned"), grouped per assignment (spec §4.3, via
+    /// GraphQL). One <see cref="PeerReviewGroup"/> per assignment with ≥1 pending.
     /// </summary>
     public async Task<IReadOnlyList<PeerReviewGroup>> GetPendingPeerReviewsAsync(
-        IEnumerable<long> courseIds, long selfId, CancellationToken ct = default)
+        IEnumerable<long> courseIds, CancellationToken ct = default)
     {
         var groups = new List<PeerReviewGroup>();
         foreach (var courseId in courseIds)
         {
-            foreach (var assignment in await GetPeerReviewAssignmentsAsync(courseId, ct))
-            {
-                var pending = await GetPendingPeerReviewCountAsync(courseId, assignment.Id, selfId, ct);
-                if (pending > 0)
-                    groups.Add(new PeerReviewGroup(courseId, assignment.Name, assignment.DueAt, pending));
-            }
+            var data = await PostGraphQlAsync(PeerReviewQuery, new { courseId = courseId.ToString() }, ct);
+            groups.AddRange(PeerReviewParser.FromCourseData(data, courseId));
         }
         return groups;
+    }
+
+    /// <summary>POST a GraphQL query and return its "data" element; throws on GraphQL errors.</summary>
+    public async Task<JsonElement> PostGraphQlAsync(
+        string query, object? variables, CancellationToken ct = default)
+    {
+        var (body, _) = await SendWithRetryAsync(() =>
+            new HttpRequestMessage(HttpMethod.Post, _graphqlUrl)
+            {
+                Content = JsonContent.Create(new { query, variables }),
+            }, ct);
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array
+            && errors.GetArrayLength() > 0)
+        {
+            throw new CanvasException(0, $"Canvas GraphQL error: {errors.GetRawText()}");
+        }
+        // Clone so the value survives disposal of the JsonDocument.
+        return root.GetProperty("data").Clone();
     }
 
     /// <summary>GET a single JSON object and deserialize it.</summary>
     public async Task<T> GetAsync<T>(string path, CancellationToken ct = default)
     {
-        var body = await SendWithRetryAsync(BuildUri(path), ct);
+        var (body, _) = await SendWithRetryAsync(() => Get(BuildUri(path)), ct);
         return JsonSerializer.Deserialize<T>(body, JsonOptions)
             ?? throw new CanvasException(0, $"Canvas returned null for {path}.");
     }
@@ -126,7 +148,8 @@ internal sealed class CanvasClient
 
         while (url is not null)
         {
-            var (body, nextLink) = await SendWithRetryWithLinkAsync(url, ct);
+            var nextUrl = url;
+            var (body, nextLink) = await SendWithRetryAsync(() => Get(nextUrl), ct);
             var page = JsonSerializer.Deserialize<List<T>>(body, JsonOptions);
             if (page is not null) results.AddRange(page);
             url = nextLink;
@@ -134,6 +157,8 @@ internal sealed class CanvasClient
 
         return results;
     }
+
+    private static HttpRequestMessage Get(string url) => new(HttpMethod.Get, url);
 
     private string BuildUri(string path, bool perPage = false)
     {
@@ -145,15 +170,13 @@ internal sealed class CanvasClient
         return url;
     }
 
-    private async Task<string> SendWithRetryAsync(string url, CancellationToken ct)
-        => (await SendWithRetryWithLinkAsync(url, ct)).Body;
-
-    private async Task<(string Body, string? NextLink)> SendWithRetryWithLinkAsync(
-        string url, CancellationToken ct)
+    private async Task<(string Body, string? NextLink)> SendWithRetryAsync(
+        Func<HttpRequestMessage> requestFactory, CancellationToken ct)
     {
         for (var attempt = 0; ; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = requestFactory();
+            var target = request.RequestUri;
             using var response = await _http.SendAsync(request, ct);
 
             if (response.IsSuccessStatusCode)
@@ -163,7 +186,7 @@ internal sealed class CanvasClient
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
-                throw new CanvasAuthException($"Canvas returned 401 Unauthorized for {url}.");
+                throw new CanvasAuthException($"Canvas returned 401 Unauthorized for {target}.");
 
             var throttled = response.StatusCode == HttpStatusCode.Forbidden
                 || (int)response.StatusCode == 429;
@@ -175,7 +198,7 @@ internal sealed class CanvasClient
 
             var detail = await response.Content.ReadAsStringAsync(ct);
             throw new CanvasException((int)response.StatusCode,
-                $"Canvas request failed: HTTP {(int)response.StatusCode} for {url}. Body: {detail}");
+                $"Canvas request failed: HTTP {(int)response.StatusCode} for {target}. Body: {detail}");
         }
     }
 

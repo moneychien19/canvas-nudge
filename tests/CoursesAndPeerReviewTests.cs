@@ -17,24 +17,6 @@ public class CoursesAndPeerReviewTests
             { Content = new StringContent(_body, Encoding.UTF8, "application/json") });
     }
 
-    /// <summary>Routes by first matching URL substring (order most-specific first).</summary>
-    private sealed class RoutingHandler : HttpMessageHandler
-    {
-        private readonly (string Match, string Body)[] _routes;
-        public RoutingHandler(params (string, string)[] routes) => _routes = routes;
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
-        {
-            var url = r.RequestUri!.ToString();
-            foreach (var (match, body) in _routes)
-            {
-                if (url.Contains(match))
-                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                    { Content = new StringContent(body, Encoding.UTF8, "application/json") });
-            }
-            throw new InvalidOperationException($"No route for {url}");
-        }
-    }
-
     private static CanvasClient Client(HttpMessageHandler handler) =>
         new(new HttpClient(handler), "https://canvas.example.edu", "tok", (_, _) => Task.CompletedTask);
 
@@ -54,62 +36,47 @@ public class CoursesAndPeerReviewTests
         Assert.Equal("17-214", map[101]);   // null name -> course_code
     }
 
-    // --- 3.2 peer reviews ---
+    // --- 3.2 peer reviews via GraphQL (REST index can't do this for students) ---
+
+    // Real Canvas GraphQL response shape (captured from canvas.cmu.edu).
+    private const string GraphQlBody = """
+    { "data": { "course": { "assignmentsConnection": { "nodes": [
+        { "_id": "1", "name": "WA1", "dueAt": "2026-06-14T23:59:59-04:00",
+          "assessmentRequestsForCurrentUser": [
+            { "workflowState": "assigned" }, { "workflowState": "assigned" },
+            { "workflowState": "assigned" } ] },
+        { "_id": "2", "name": "WA2", "dueAt": "2026-05-29T23:59:59-04:00",
+          "assessmentRequestsForCurrentUser": [
+            { "workflowState": "completed" }, { "workflowState": "completed" } ] },
+        { "_id": "3", "name": "WA3 undated", "dueAt": null,
+          "assessmentRequestsForCurrentUser": [ { "workflowState": "assigned" } ] }
+    ] } } } }
+    """;
 
     [Fact]
-    public async Task GetPeerReviewAssignments_KeepsOnlyEnabledAndPublished()
+    public async Task GetPendingPeerReviews_GroupsAssignedOnly_OmitsCompleted()
     {
-        var json = """
-        [ { "id": 1, "name": "Design Doc", "peer_reviews": true,  "published": true  },
-          { "id": 2, "name": "Draft",      "peer_reviews": true,  "published": false },
-          { "id": 3, "name": "Quiz",       "peer_reviews": false, "published": true  } ]
-        """;
-        var result = await Client(new StubHandler(json)).GetPeerReviewAssignmentsAsync(100);
+        var groups = await Client(new StubHandler(GraphQlBody))
+            .GetPendingPeerReviewsAsync(new long[] { 100 });
 
-        var a = Assert.Single(result);
-        Assert.Equal("Design Doc", a.Name);
+        Assert.Equal(2, groups.Count);  // WA2 (all completed) omitted
+
+        var wa1 = groups.Single(g => g.AssignmentName == "WA1");
+        Assert.Equal(100, wa1.CourseId);
+        Assert.Equal(3, wa1.PendingCount);
+        Assert.Equal(new DateTimeOffset(2026, 6, 14, 23, 59, 59, TimeSpan.FromHours(-4)), wa1.DueAt);
+
+        var wa3 = groups.Single(g => g.AssignmentName == "WA3 undated");
+        Assert.Equal(1, wa3.PendingCount);
+        Assert.Null(wa3.DueAt);
     }
 
     [Fact]
-    public async Task GetPendingPeerReviewCount_CountsOnlySelfAssigned()
+    public async Task PostGraphQl_Throws_OnGraphQlErrors()
     {
-        var json = """
-        [ { "assessor_id": 555, "workflow_state": "assigned"  },
-          { "assessor_id": 555, "workflow_state": "assigned"  },
-          { "assessor_id": 555, "workflow_state": "completed" },
-          { "assessor_id": 999, "workflow_state": "assigned"  } ]
-        """;
-        var count = await Client(new StubHandler(json))
-            .GetPendingPeerReviewCountAsync(100, 1, selfId: 555);
+        var body = """{ "errors": [ { "message": "Invalid course" } ], "data": null }""";
 
-        Assert.Equal(2, count);  // self + assigned only
-    }
-
-    [Fact]
-    public async Task GetPendingPeerReviews_GroupsByAssignment_AndOmitsZero()
-    {
-        var handler = new RoutingHandler(
-            ("/assignments/1/peer_reviews", """
-                [ { "assessor_id": 555, "workflow_state": "assigned" },
-                  { "assessor_id": 555, "workflow_state": "assigned" },
-                  { "assessor_id": 555, "workflow_state": "assigned" } ]
-                """),
-            ("/assignments/9/peer_reviews", """
-                [ { "assessor_id": 555, "workflow_state": "completed" } ]
-                """),
-            ("/courses/100/assignments", """
-                [ { "id": 1, "name": "Design Doc", "peer_reviews": true, "published": true,
-                    "due_at": "2026-06-14T03:59:00Z" },
-                  { "id": 9, "name": "Done Review", "peer_reviews": true, "published": true,
-                    "due_at": null } ]
-                """));
-
-        var groups = await Client(handler).GetPendingPeerReviewsAsync(new long[] { 100 }, selfId: 555);
-
-        var g = Assert.Single(groups);  // assignment 9 has 0 pending -> omitted
-        Assert.Equal(100, g.CourseId);
-        Assert.Equal("Design Doc", g.AssignmentName);
-        Assert.Equal(3, g.PendingCount);
-        Assert.Equal(new DateTimeOffset(2026, 6, 14, 3, 59, 0, TimeSpan.Zero), g.DueAt);
+        await Assert.ThrowsAsync<CanvasException>(() =>
+            Client(new StubHandler(body)).PostGraphQlAsync("query{}", null));
     }
 }

@@ -43,14 +43,13 @@ internal static class Program
         var canvas = new CanvasClient(http, config.CanvasBaseUrl, config.CanvasApiToken);
 
         // Fetch the current outstanding set (spec §4).
-        var selfId = await canvas.GetSelfIdAsync();
         var courses = await canvas.GetActiveCoursesAsync();
         var courseLabels = CanvasCourse.BuildLabelMap(courses);
         string Label(long courseId) =>
             courseLabels.TryGetValue(courseId, out var name) ? name : $"course {courseId}";
 
         var todo = await canvas.GetTodoAssignmentsAsync();
-        var peerGroups = await canvas.GetPendingPeerReviewsAsync(courseLabels.Keys, selfId);
+        var peerGroups = await canvas.GetPendingPeerReviewsAsync(courseLabels.Keys);
 
         var assignments = todo
             .Select(t => new OutstandingAssignment(
@@ -65,7 +64,8 @@ internal static class Program
         var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
         var now = DateTimeOffset.UtcNow;
         var content = DigestBuilder.Build(assignments, peerReviews, now, tz);
-        Console.WriteLine($"\nOutstanding items: {content.TotalCount}");
+        Console.WriteLine($"\nOutstanding items: {content.TotalCount} " +
+                          $"({assignments.Count} assignments, {peerReviews.Count} peer-review groups)");
 
         // Proactive PAT-expiry warning (§8.2); forces a send even on empty.
         var expiryWarning = ExpiryWarning.Compute(config.CanvasTokenExpiresAt, now, tz);
