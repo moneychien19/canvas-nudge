@@ -53,6 +53,10 @@ internal sealed class CanvasClient
         _apiBase = root + "/api/v1";
         _graphqlUrl = root + "/api/graphql";
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        // Canvas now rejects API requests without a User-Agent header with HTTP 403
+        // ("not provided a valid user agent"). See the Canvas API announcement:
+        // https://community.canvaslms.com/t5/Canvas-LMS-Blog/Enforcing-User-Agent-Header-for-Canvas-API-Requests/ba-p/658205
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("CanvasNudge/1.0 (+https://github.com/canvas-nudge)");
         _delay = delay ?? Task.Delay;
     }
 
