@@ -22,7 +22,7 @@ public class ConfigTests
         Assert.Equal("tok", cfg.CanvasApiToken);
         Assert.Equal("https://discord/wh", cfg.DiscordWebhookUrl);
         Assert.Equal("https://canvas.cmu.edu", cfg.CanvasBaseUrl);
-        Assert.Equal("Asia/Taipei", cfg.Timezone);
+        Assert.Equal("America/New_York", cfg.Timezone);
         Assert.True(cfg.NotifyWhenEmpty);        // default true
         Assert.True(cfg.NotifyErrorsToDiscord);  // default true
         Assert.Null(cfg.CanvasTokenExpiresAt);
@@ -33,7 +33,7 @@ public class ConfigTests
     {
         var map = WithRequired();
         map["CANVAS_BASE_URL"] = "https://canvas.example.edu";
-        map["TIMEZONE"] = "America/New_York";
+        map["TIMEZONE"] = "Asia/Taipei";
         map["NOTIFY_WHEN_EMPTY"] = "false";
         map["NOTIFY_ERRORS_TO_DISCORD"] = "false";
         map["CANVAS_TOKEN_EXPIRES_AT"] = "2026-10-01";
@@ -41,7 +41,7 @@ public class ConfigTests
         var cfg = Config.Load(Env(map));
 
         Assert.Equal("https://canvas.example.edu", cfg.CanvasBaseUrl);
-        Assert.Equal("America/New_York", cfg.Timezone);
+        Assert.Equal("Asia/Taipei", cfg.Timezone);
         Assert.False(cfg.NotifyWhenEmpty);
         Assert.False(cfg.NotifyErrorsToDiscord);
         Assert.Equal("2026-10-01", cfg.CanvasTokenExpiresAt);

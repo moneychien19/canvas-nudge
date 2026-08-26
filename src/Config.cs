@@ -20,7 +20,7 @@ internal sealed record Config(
             CanvasApiToken: Required(getEnv, "CANVAS_API_TOKEN"),
             DiscordWebhookUrl: Required(getEnv, "DISCORD_WEBHOOK_URL"),
             CanvasBaseUrl: Optional(getEnv, "CANVAS_BASE_URL") ?? "https://canvas.cmu.edu",
-            Timezone: Optional(getEnv, "TIMEZONE") ?? "Asia/Taipei",
+            Timezone: Optional(getEnv, "TIMEZONE") ?? "America/New_York",
             NotifyWhenEmpty: Bool(getEnv, "NOTIFY_WHEN_EMPTY", true),
             NotifyErrorsToDiscord: Bool(getEnv, "NOTIFY_ERRORS_TO_DISCORD", true),
             CanvasTokenExpiresAt: Optional(getEnv, "CANVAS_TOKEN_EXPIRES_AT"));

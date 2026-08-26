@@ -6,6 +6,7 @@ namespace CanvasNudge.Tests;
 public class DigestTests
 {
     private static readonly TimeZoneInfo Taipei = TimeZoneInfo.FindSystemTimeZoneById("Asia/Taipei");
+    private static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
     // "now" = 2026-06-15 14:17 Taipei (UTC+8) -> 06:17Z
     private static readonly DateTimeOffset Now = new(2026, 6, 15, 6, 17, 0, TimeSpan.Zero);
@@ -121,6 +122,15 @@ public class DigestTests
         Assert.Contains("待完成 3 件", content.Description);
         Assert.Contains("互評截止 6/17", content.Description);   // peer-review deadline + relative hint
         Assert.Contains("還有 2 天", content.Description);
+    }
+
+    [Fact]
+    public void Build_LabelsHeader_美東時間_WhenTimezoneIsNewYork()
+    {
+        var content = DigestBuilder.Build(
+            Array.Empty<OutstandingAssignment>(), Array.Empty<OutstandingPeerReview>(), Now, NewYork);
+
+        Assert.Contains("（美東時間）", content.Header);
     }
 
     [Fact]

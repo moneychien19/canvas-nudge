@@ -5,7 +5,7 @@ A small scheduled job that, **every 3 hours**, fetches all of your currently **o
 It's a recurring reminder, not new-item detection: the full standing list is re-sent each cycle, and an item drops out once Canvas reports it done. No local state, no dedup. See [`todos/spec.md`](todos/spec.md) for the full design.
 
 ```
-📋 待完成 — 共 4 項 · 2026/06/15 14:17（台北時間）
+📋 待完成 — 共 4 項 · 2026/06/15 14:17（美東時間）
 
 作業 (3)
 • [15-503] Cache Lab — 截止 6/17（週二）23:59（還有 2 天）
@@ -54,7 +54,7 @@ Under **Settings → Secrets and variables → Actions**:
 | Variable                   | Default                  | Notes                                            |
 | -------------------------- | ------------------------ | ------------------------------------------------ |
 | `CANVAS_BASE_URL`          | `https://canvas.cmu.edu` | your Canvas URL                                  |
-| `TIMEZONE`                 | `Asia/Taipei`            | IANA tz for due dates + timestamp                |
+| `TIMEZONE`                 | `America/New_York`       | IANA tz for due dates + timestamp                |
 | `NOTIFY_WHEN_EMPTY`        | `true`                   | `true` = send 🎉 line when nothing's outstanding |
 | `NOTIFY_ERRORS_TO_DISCORD` | `true`                   | also post failures (e.g. expired PAT) to Discord |
 | `CANVAS_TOKEN_EXPIRES_AT`  | _(unset)_                | `YYYY-MM-DD` PAT expiry → warns ≤14 days out     |

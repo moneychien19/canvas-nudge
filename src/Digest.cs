@@ -103,9 +103,13 @@ internal static class DigestBuilder
         return $"📋 待完成 — 共 {total} 項 · {stamp}（{TimeZoneLabel(tz)}）";
     }
 
-    /// <summary>Friendly tz label; Taipei gets the spec's 台北時間, else the IANA id.</summary>
-    private static string TimeZoneLabel(TimeZoneInfo tz) =>
-        tz.Id == "Asia/Taipei" ? "台北時間" : tz.Id;
+    /// <summary>Friendly tz label for known zones (spec-style zh-Hant), else the IANA id.</summary>
+    private static string TimeZoneLabel(TimeZoneInfo tz) => tz.Id switch
+    {
+        "Asia/Taipei" => "台北時間",
+        "America/New_York" => "美東時間",
+        _ => tz.Id,
+    };
 
     private static IEnumerable<T> SortByDue<T>(IEnumerable<T> items, Func<T, DateTimeOffset?> due) =>
         items.OrderBy(i => due(i).HasValue ? 0 : 1)          // undated last
