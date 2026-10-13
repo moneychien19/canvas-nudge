@@ -12,7 +12,8 @@ internal sealed record Config(
     string Timezone,
     bool NotifyWhenEmpty,
     bool NotifyErrorsToDiscord,
-    string? CanvasTokenExpiresAt)
+    string? CanvasTokenExpiresAt,
+    Language Language)
 {
     public static Config Load(Func<string, string?> getEnv)
     {
@@ -23,7 +24,8 @@ internal sealed record Config(
             Timezone: Optional(getEnv, "TIMEZONE") ?? "America/New_York",
             NotifyWhenEmpty: Bool(getEnv, "NOTIFY_WHEN_EMPTY", true),
             NotifyErrorsToDiscord: Bool(getEnv, "NOTIFY_ERRORS_TO_DISCORD", true),
-            CanvasTokenExpiresAt: Optional(getEnv, "CANVAS_TOKEN_EXPIRES_AT"));
+            CanvasTokenExpiresAt: Optional(getEnv, "CANVAS_TOKEN_EXPIRES_AT"),
+            Language: ParseLanguage(getEnv));
     }
 
     private static string Required(Func<string, string?> getEnv, string key) =>
@@ -35,6 +37,20 @@ internal sealed record Config(
     {
         var raw = getEnv(key);
         return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+    }
+
+    /// <summary>LANGUAGE: "en" (default) or "zh-Hant" (aliases: zh, zh-TW), case-insensitive.</summary>
+    private static Language ParseLanguage(Func<string, string?> getEnv)
+    {
+        var v = Optional(getEnv, "LANGUAGE");
+        if (v is null) return Language.En;
+        return v.ToLowerInvariant() switch
+        {
+            "en" => Language.En,
+            "zh-hant" or "zh-tw" or "zh" => Language.ZhHant,
+            _ => throw new InvalidOperationException(
+                $"Invalid LANGUAGE: '{v}' (expected 'en' or 'zh-Hant')."),
+        };
     }
 
     private static bool Bool(Func<string, string?> getEnv, string key, bool fallback)

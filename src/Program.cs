@@ -15,8 +15,9 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            // Can't reach Discord without config (no webhook); just fail loud.
-            Console.Error.WriteLine(ErrorReporter.LogText(ex));
+            // Can't reach Discord without config (no webhook); just fail loud. LANGUAGE
+            // isn't resolved yet, so fall back to English.
+            Console.Error.WriteLine(ErrorReporter.LogText(ex, Language.En));
             return 1;
         }
 
@@ -31,9 +32,9 @@ internal static class Program
         catch (Exception ex)
         {
             // Fail loud in the log (§8 / §8.1) and, if enabled, surface it in Discord.
-            Console.Error.WriteLine(ErrorReporter.LogText(ex));
+            Console.Error.WriteLine(ErrorReporter.LogText(ex, config.Language));
             if (config.NotifyErrorsToDiscord)
-                await TryReportErrorToDiscord(http, config.DiscordWebhookUrl, ex);
+                await TryReportErrorToDiscord(http, config.DiscordWebhookUrl, ex, config.Language);
             return 1;
         }
     }
@@ -63,13 +64,13 @@ internal static class Program
         // Assemble the digest and decide what to send (spec §5).
         var tz = TimeZoneInfo.FindSystemTimeZoneById(config.Timezone);
         var now = DateTimeOffset.UtcNow;
-        var content = DigestBuilder.Build(assignments, peerReviews, now, tz);
+        var content = DigestBuilder.Build(assignments, peerReviews, now, tz, config.Language);
         Console.WriteLine($"\nOutstanding items: {content.TotalCount} " +
                           $"({assignments.Count} assignments, {peerReviews.Count} peer-review groups)");
 
         // Proactive PAT-expiry warning (§8.2); forces a send even on empty.
-        var expiryWarning = ExpiryWarning.Compute(config.CanvasTokenExpiresAt, now, tz);
-        var payload = MessagePlanner.Plan(content, config.NotifyWhenEmpty, expiryWarning);
+        var expiryWarning = ExpiryWarning.Compute(config.CanvasTokenExpiresAt, now, tz, config.Language);
+        var payload = MessagePlanner.Plan(content, config.NotifyWhenEmpty, expiryWarning, config.Language);
         var notifier = new DiscordNotifier(http, config.DiscordWebhookUrl);
         if (payload is not null)
         {
@@ -86,16 +87,19 @@ internal static class Program
     }
 
     /// <summary>Best-effort error post; never let a reporting failure mask the original.</summary>
-    private static async Task TryReportErrorToDiscord(HttpClient http, string webhookUrl, Exception ex)
+    private static async Task TryReportErrorToDiscord(
+        HttpClient http, string webhookUrl, Exception ex, Language lang)
     {
         try
         {
             var notifier = new DiscordNotifier(http, webhookUrl);
-            await notifier.SendAsync(ErrorReporter.DiscordPayload(ex));
+            await notifier.SendAsync(ErrorReporter.DiscordPayload(ex, lang));
         }
         catch (Exception reportEx)
         {
-            Console.Error.WriteLine($"（另外，回報錯誤到 Discord 也失敗了：{reportEx.Message}）");
+            Console.Error.WriteLine(lang.Pick(
+                $"(Also failed to report the error to Discord: {reportEx.Message})",
+                $"（另外，回報錯誤到 Discord 也失敗了：{reportEx.Message}）"));
         }
     }
 
@@ -110,6 +114,7 @@ internal static class Program
         Console.WriteLine($"  NOTIFY_WHEN_EMPTY         = {config.NotifyWhenEmpty}");
         Console.WriteLine($"  NOTIFY_ERRORS_TO_DISCORD  = {config.NotifyErrorsToDiscord}");
         Console.WriteLine($"  CANVAS_TOKEN_EXPIRES_AT   = {config.CanvasTokenExpiresAt ?? "(unset)"}");
+        Console.WriteLine($"  LANGUAGE                  = {config.Language}");
     }
 
     private static string Redact(string secret) =>

@@ -31,3 +31,4 @@ jobs:
           NOTIFY_WHEN_EMPTY: ${{ vars.NOTIFY_WHEN_EMPTY || 'true' }}
           NOTIFY_ERRORS_TO_DISCORD: ${{ vars.NOTIFY_ERRORS_TO_DISCORD || 'true' }}
           CANVAS_TOKEN_EXPIRES_AT: ${{ vars.CANVAS_TOKEN_EXPIRES_AT }}
+          LANGUAGE: ${{ vars.LANGUAGE || 'en' }}

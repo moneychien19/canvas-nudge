@@ -7,7 +7,8 @@ namespace CanvasNudge;
 internal static class MessagePlanner
 {
     /// <summary>Celebratory empty-state line (spec §5). Also carries the warning when set.</summary>
-    public const string EmptyMessage = "恭喜，目前沒有未完成事項 🎉";
+    public static string EmptyMessage(Language lang) =>
+        lang.Pick("All caught up — nothing outstanding 🎉", "恭喜，目前沒有未完成事項 🎉");
 
     /// <summary>
     /// Returns the payload to send, or null to stay silent. An active
@@ -15,7 +16,7 @@ internal static class MessagePlanner
     /// empty list, so the warning is never dropped (spec §8.2 gap fix).
     /// </summary>
     public static DiscordWebhookPayload? Plan(
-        DigestContent content, bool notifyWhenEmpty, string? expiryWarning)
+        DigestContent content, bool notifyWhenEmpty, string? expiryWarning, Language lang)
     {
         if (content.TotalCount > 0)
         {
@@ -30,8 +31,8 @@ internal static class MessagePlanner
         if (!notifyWhenEmpty && expiryWarning is null) return null;
 
         var body = expiryWarning is null
-            ? EmptyMessage
-            : $"{expiryWarning}\n{EmptyMessage}";
+            ? EmptyMessage(lang)
+            : $"{expiryWarning}\n{EmptyMessage(lang)}";
         return new DiscordWebhookPayload(Content: body);
     }
 }

@@ -1,20 +1,39 @@
 # Canvas Nudge
 
-A small scheduled job that, **every 3 hours**, fetches all of your currently **outstanding** Canvas work (assignments not yet submitted + peer reviews not yet done) and posts a single Traditional-Chinese digest to a Discord channel.
+**English** | [繁體中文](README.zh-TW.md)
+
+A small scheduled job that, **every 3 hours**, fetches all of your currently **outstanding** Canvas work (assignments not yet submitted + peer reviews not yet done) and posts a single digest to a Discord channel. Notifications are in English by default; set `LANGUAGE=zh-Hant` for Traditional Chinese.
 
 It's a recurring reminder, not new-item detection: the full standing list is re-sent each cycle, and an item drops out once Canvas reports it done. No local state, no dedup. See [`todos/spec.md`](todos/spec.md) for the full design.
+
+```
+📋 Outstanding — 4 items · 2026/06/15 14:17 (Eastern Time)
+
+Assignments (3)
+• [15-503] Cache Lab — due Wed 6/17 23:59 (in 2 days)
+• [17-214] Homework 3 — due Thu 6/18 09:00 (in 3 days)
+• [15-619] Project Phase 1 — overdue by 1 day ⚠️
+
+Peer Reviews (1)
+• [15-513] Peer review: “Design Doc” — 3 pending (review due 6/17, in 2 days)
+```
+
+<details>
+<summary>Same digest with <code>LANGUAGE=zh-Hant</code></summary>
 
 ```
 📋 待完成 — 共 4 項 · 2026/06/15 14:17（美東時間）
 
 作業 (3)
-• [15-503] Cache Lab — 截止 6/17（週二）23:59（還有 2 天）
-• [17-214] Homework 3 — 截止 6/18（週三）09:00（還有 3 天）
+• [15-503] Cache Lab — 截止 6/17（週三）23:59（還有 2 天）
+• [17-214] Homework 3 — 截止 6/18（週四）09:00（還有 3 天）
 • [15-619] Project Phase 1 — 已逾期 1 天 ⚠️
 
 同儕互評 (1)
-• [15-513] 互評：「Design Doc」— 待完成 3 件（作業截止 6/14）
+• [15-513] 互評：「Design Doc」— 待完成 3 件（互評截止 6/17，還有 2 天）
 ```
+
+</details>
 
 ## How it works
 
@@ -25,6 +44,8 @@ It's a recurring reminder, not new-item detection: the full standing list is re-
 - **.NET 8 console app** (`src/`), BCL only (+ `DotNetEnv` for local dev).
 
 ## Setup
+
+Fork this repo (or use it as a template), then:
 
 ### 1. Create a Canvas Personal Access Token
 
@@ -38,11 +59,11 @@ It's a recurring reminder, not new-item detection: the full standing list is re-
 1. In Discord: **Server Settings → Integrations → Webhooks → New Webhook**.
 2. Pick the target channel, **Copy Webhook URL** (also sensitive — anyone with it can post to the channel).
 
-### 3. Configure the repo (keep it **private**)
+### 3. Configure the repo
 
 Under **Settings → Secrets and variables → Actions**:
 
-**Secrets** (encrypted):
+**Secrets** (encrypted; never visible in the repo or logs, even if the repo is public):
 
 | Secret                | Value                       |
 | --------------------- | --------------------------- |
@@ -53,6 +74,7 @@ Under **Settings → Secrets and variables → Actions**:
 
 | Variable                   | Default                  | Notes                                            |
 | -------------------------- | ------------------------ | ------------------------------------------------ |
+| `LANGUAGE`                 | `en`                     | `en` or `zh-Hant` (Traditional Chinese)          |
 | `CANVAS_BASE_URL`          | `https://canvas.cmu.edu` | your Canvas URL                                  |
 | `TIMEZONE`                 | `America/New_York`       | IANA tz for due dates + timestamp                |
 | `NOTIFY_WHEN_EMPTY`        | `true`                   | `true` = send 🎉 line when nothing's outstanding |
@@ -62,6 +84,8 @@ Under **Settings → Secrets and variables → Actions**:
 ### 4. Test it
 
 Trigger the workflow manually: **Actions → canvas-outstanding-notifier → Run workflow**. A digest (or 🎉 line) should appear in your Discord channel.
+
+> **Note:** On public repos, GitHub disables scheduled workflows after 60 days without repository activity. If notifications stop, re-enable the workflow from the **Actions** tab (or push any commit).
 
 ## Local development
 
@@ -78,7 +102,7 @@ dotnet test
 
 ## Security
 
-- Keep the repo **private** — it references a Canvas PAT and a webhook.
-- Never commit secrets; `.env` is gitignored and CI reads from Actions secrets.
-- The PAT acts as your full Canvas account via the API — rotate it every 120 days
-  and keep `CANVAS_TOKEN_EXPIRES_AT` current so the digest reminds you.
+- Secrets live only in GitHub Actions secrets (CI) or your local `.env` (gitignored) — never commit them.
+- The run log prints secrets only as `(set, N chars)`, and GitHub additionally masks secret values in logs, so it's safe for the repo (and its Actions logs) to be public.
+- The workflow has no `pull_request` trigger, so forks and PRs can't access your secrets.
+- The PAT acts as your full Canvas account via the API — rotate it every 120 days and keep `CANVAS_TOKEN_EXPIRES_AT` current so the digest reminds you.

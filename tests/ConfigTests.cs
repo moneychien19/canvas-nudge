@@ -26,6 +26,7 @@ public class ConfigTests
         Assert.True(cfg.NotifyWhenEmpty);        // default true
         Assert.True(cfg.NotifyErrorsToDiscord);  // default true
         Assert.Null(cfg.CanvasTokenExpiresAt);
+        Assert.Equal(Language.En, cfg.Language);  // default English
     }
 
     [Fact]
@@ -99,5 +100,29 @@ public class ConfigTests
         map["CANVAS_TOKEN_EXPIRES_AT"] = "";
 
         Assert.Null(Config.Load(Env(map)).CanvasTokenExpiresAt);
+    }
+
+    [Theory]
+    [InlineData("en", "En")]
+    [InlineData("EN", "En")]
+    [InlineData("zh-Hant", "ZhHant")]
+    [InlineData("zh-TW", "ZhHant")]
+    [InlineData(" zh ", "ZhHant")]
+    public void Load_ParsesLanguage(string raw, string expected)
+    {
+        var map = WithRequired();
+        map["LANGUAGE"] = raw;
+
+        Assert.Equal(expected, Config.Load(Env(map)).Language.ToString());  // Language is internal
+    }
+
+    [Fact]
+    public void Load_Throws_OnInvalidLanguage()
+    {
+        var map = WithRequired();
+        map["LANGUAGE"] = "fr";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Config.Load(Env(map)));
+        Assert.Contains("LANGUAGE", ex.Message);
     }
 }
